@@ -6,6 +6,7 @@ public class Point
 
     private Color color = Color.BLACK;
     private int population;
+    private int districtNumber = 0;
     public Point(double x, double y, int population)
     {
         this.x = x;
@@ -43,5 +44,13 @@ public class Point
 
     public int getPopulation() {
         return population;
+    }
+
+    public void setDistrictNumber(int districtNumber) {
+        this.districtNumber = districtNumber;
+    }
+
+    public int getDistrictNumber() {
+        return districtNumber;
     }
 }

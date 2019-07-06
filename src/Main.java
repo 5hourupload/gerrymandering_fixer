@@ -7,6 +7,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.image.PixelReader;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -27,6 +28,12 @@ public class Main extends Application {
     double AVERAGE_POPULATION = 797273;
     int iterations = 0;
     boolean weightsEnabled = false;
+    String currentDistrictsArray[][];
+    Map<String, Integer> colorNumberMap = new HashMap<>();
+    Image currentDistricts;
+    int skippedCount = 0;
+    Map<Integer, Map<String, Double>> votingPercentages = new HashMap<>();
+
 
     public static void main(String[] args) {
         Application.launch(args);
@@ -133,40 +140,128 @@ public class Main extends Application {
             }
         });
 
-        Button printPopulations = new Button();
-        printPopulations.setText("Print Populations");
-        printPopulations.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
-            @Override
-            public void handle(javafx.event.ActionEvent event) {
-                printPopulations();
-            }
-        });
+//        Button printPopulations = new Button();
+//        printPopulations.setText("Print Populations");
+//        printPopulations.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
+//            @Override
+//            public void handle(javafx.event.ActionEvent event) {
+//                printPopulations();
+//            }
+//        });
+//
+//        Button updateWeights = new Button();
+//        updateWeights.setText("update Weights");
+//        updateWeights.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
+//            @Override
+//            public void handle(javafx.event.ActionEvent event) {
+//                updateWeights();
+//                System.out.println("weights updated");
+//            }
+//        });
 
-        Button updateWeights = new Button();
-        updateWeights.setText("update Weights");
-        updateWeights.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
+        Button elect = new Button();
+        elect.setText("simulate election");
+        elect.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
             @Override
             public void handle(javafx.event.ActionEvent event) {
-                updateWeights();
-                System.out.println("weights updated");
+
+                simulateElection();
             }
         });
 
         VBox vBox = new VBox();
-        vBox.getChildren().addAll(canvas, update,updateWeights);
+        vBox.getChildren().addAll(canvas, update, elect);
         Scene scene = new Scene(vBox);
         stage.setScene(scene);
         stage.setTitle("Creation of a Canvas");
         stage.show();
+
+        //load the current districts into the current districts array
+        currentDistricts = getImage("/texas_district_map_only.png");
+        PixelReader pixelReader = currentDistricts.getPixelReader();
+        currentDistrictsArray = new String[(int)currentDistricts.getWidth()][(int)currentDistricts.getHeight()];
+        for (int i = 0; i < currentDistricts.getWidth(); i++)
+        {
+            for (int j = 0; j < currentDistricts.getHeight(); j++)
+            {
+                currentDistrictsArray[i][j] = pixelReader.getColor(i,j).toString();
+            }
+        }
+
+        //load in district keys
+        try (BufferedReader br = new BufferedReader(new FileReader("district_key.txt"))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] lineArray = line.split(" ");
+                colorNumberMap.put(lineArray[1],Integer.parseInt(lineArray[0]));
+            }
+        }
+
+        //load in voting percentages
+        try (BufferedReader br = new BufferedReader(new FileReader("voting_percentages.txt"))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                int districtNumber = Integer.parseInt(line);
+                Map<String, Double> tempMap = new HashMap<>();
+                String firstParty = br.readLine();
+                double firstPercentage = Double.parseDouble(br.readLine());
+
+                String secondParty = br.readLine();
+                double secondPercentage = Double.parseDouble(br.readLine());
+                tempMap.put(firstParty,firstPercentage);
+                tempMap.put(secondParty,secondPercentage);
+                votingPercentages.put(districtNumber,tempMap);
+            }
+        }
+        System.out.println(votingPercentages);
+
+        for (Point p :pointList)
+            loadPointData(p);
+        System.out.println(skippedCount + "/" + pointList.size());
+        System.out.println(pixelReader.getColor((int) currentDistricts.getWidth()-1,(int)currentDistricts.getHeight()-1));
     }
 
-//    public void generateRandomPoints() {
-//        for (int i = 0; i < 11000; i++) {
-//            Point point = new Point((int) (Math.random() * DRAW_WIDTH),
-//                    (int) (Math.random() * DRAW_HEIGHT));
-//            pointList.add(point);
-//        }
-//    }
+    private void simulateElection() {
+        Map<Color, Map<String, Double>> results = new HashMap<>();
+        for (Centroid centroid : centroidList)
+        {
+            Map<String, Double> temp = new HashMap<>();
+            temp.put("REP", 0d);
+            temp.put("DEM", 0d);
+            results.put(centroid.getColor(),temp);
+        }
+        for (Point p : pointList)
+        {
+            if (p.getDistrictNumber() != 0)
+            {
+                Map<String,Double> votingPattern = votingPercentages.get(p.getDistrictNumber());
+                Map<String, Double> districtResult = results.get(p.getColor());
+                districtResult.put("REP", districtResult.get("REP") + votingPattern.get("REP"));
+                districtResult.put("DEM", districtResult.get("DEM") + votingPattern.get("DEM"));
+
+            }
+        }
+        int reps = 0;
+        int dems = 0;
+
+        Iterator it = results.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry)it.next();
+            System.out.println(pair.getKey() + " = " + pair.getValue());
+            Map<String, Double> result = (Map) pair.getValue();
+            if (result.get("REP") > result.get("DEM"))
+            {
+                reps++;
+            }
+            else
+            {
+                dems++;
+            }
+
+            it.remove(); // avoids a ConcurrentModificationException
+        }
+        System.out.println(reps + " " + dems);
+    }
 
     public void generateRandomCentroids(int number) {
         List<Color> colors = new LinkedList<>();
@@ -332,8 +427,7 @@ public class Main extends Application {
 //                if (Math.abs(c.getPopulation() - AVERAGE_POPULATION) < 50_000)
 //                    continue;
                 if (c.getPopulation() > AVERAGE_POPULATION)
-                    if (c.getWeight() > 4) continue;
-
+//                    if (c.getWeight() > 10) continue;
                     c.setWeight(c.getWeight()+.05);
 //                    c.setWeight(c.getWeight()*.99);
 //                    c.setWeight(c.getWeight()-(.01 * (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION)));
@@ -349,8 +443,24 @@ public class Main extends Application {
             System.out.print(c.getWeight() + ":" + (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION) + " ");
         }
     }
-    private Image getBackgroundImage() {
-        return new Image(getClass().getResourceAsStream("/texas_district_map_only.png"));
+    private Image getImage(String name) {
+        return new Image(getClass().getResourceAsStream(name));
+
+    }
+    private void loadPointData(Point point)
+    {
+        double xPercentage = point.getX()/DRAW_WIDTH;
+        double yPercentage = point.getY()/DRAW_HEIGHT;
+        int newX = (int) (currentDistricts.getWidth() * xPercentage);
+        int newY = (int) (currentDistricts.getHeight() * yPercentage);
+        String color = currentDistrictsArray[newX][newY];
+        if (!colorNumberMap.containsKey(color))
+        {
+            skippedCount++;
+            return;
+        }
+        point.setDistrictNumber(colorNumberMap.get(color));
+//        System.out.println(newX + " " + newY);
 
     }
 }
