@@ -27,7 +27,6 @@ public class Main extends Application {
     int DRAW_HEIGHT = 800;
     double AVERAGE_POPULATION = 797273;
     int iterations = 0;
-    boolean weightsEnabled = false;
     String currentDistrictsArray[][];
     Map<String, Integer> colorNumberMap = new HashMap<>();
     Image currentDistricts;
@@ -56,6 +55,7 @@ public class Main extends Application {
         }
 
         Map<String, Integer> countyPopulations = new HashMap<>();
+        Map<String, String> countyVotingPatterns = new HashMap<>();
 
         for (List<String> list : countyPopulationsSpreadsheet) {
             if (!list.get(2).contains("County")) continue;
@@ -64,6 +64,7 @@ public class Main extends Application {
             name = name.replace(" " , "");
             int population = Integer.parseInt(list.get(14));
             countyPopulations.put(name,population);
+            countyVotingPatterns.put(name,list.get(15));
         }
 
         System.out.println(countyPopulations);
@@ -113,13 +114,26 @@ public class Main extends Application {
             y *= ((DRAW_WIDTH - 100) / yRange);
             x += 50;
             y += 50;
-            String name = records.get(i).get(2).replace(" ","");
+            String name = records.get(i).get(2).replace(" ", "");
             int population = countyPopulations.get(name);
+            String voting = countyVotingPatterns.get(name);
+            Map<String, Double> votingPattern = new HashMap<>();
+            if (voting.equals("REP"))
+            {
+                votingPattern.put("REP",1.0);
+                votingPattern.put("DEM",0.0);
+            }
+            else
+            {
+                votingPattern.put("REP",0.0);
+                votingPattern.put("DEM",1.0);
+            }
             for (int j = 0; j < population / 1000;j++)
             {
                 double angle = Math.random() * 360;
                 double radius = Math.random() * 25 * Math.random();
                 Point point = new Point(x + Math.cos(Math.toRadians(angle)) * radius, y + Math.sin(Math.toRadians(angle)) * radius,1000);
+                point.setVotingPattern(votingPattern);
                 pointList.add(point);
 
             }
@@ -165,7 +179,7 @@ public class Main extends Application {
             @Override
             public void handle(javafx.event.ActionEvent event) {
 
-                simulateElection();
+                simulateElection2();
             }
         });
 
@@ -177,17 +191,17 @@ public class Main extends Application {
         stage.show();
 
         //load the current districts into the current districts array
-        currentDistricts = getImage("/texas_district_map_only.png");
-        PixelReader pixelReader = currentDistricts.getPixelReader();
-        currentDistrictsArray = new String[(int)currentDistricts.getWidth()][(int)currentDistricts.getHeight()];
-        for (int i = 0; i < currentDistricts.getWidth(); i++)
-        {
-            for (int j = 0; j < currentDistricts.getHeight(); j++)
-            {
-                currentDistrictsArray[i][j] = pixelReader.getColor(i,j).toString();
-            }
-        }
-
+//        currentDistricts = getImage("/texas_district_map_only.png");
+//        PixelReader pixelReader = currentDistricts.getPixelReader();
+//        currentDistrictsArray = new String[(int)currentDistricts.getWidth()][(int)currentDistricts.getHeight()];
+//        for (int i = 0; i < currentDistricts.getWidth(); i++)
+//        {
+//            for (int j = 0; j < currentDistricts.getHeight(); j++)
+//            {
+//                currentDistrictsArray[i][j] = pixelReader.getColor(i,j).toString();
+//            }
+//        }
+//
         //load in district keys
         try (BufferedReader br = new BufferedReader(new FileReader("district_key.txt"))) {
             String line;
@@ -198,27 +212,26 @@ public class Main extends Application {
         }
 
         //load in voting percentages
-        try (BufferedReader br = new BufferedReader(new FileReader("voting_percentages.txt"))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                int districtNumber = Integer.parseInt(line);
-                Map<String, Double> tempMap = new HashMap<>();
-                String firstParty = br.readLine();
-                double firstPercentage = Double.parseDouble(br.readLine());
-
-                String secondParty = br.readLine();
-                double secondPercentage = Double.parseDouble(br.readLine());
-                tempMap.put(firstParty,firstPercentage);
-                tempMap.put(secondParty,secondPercentage);
-                votingPercentages.put(districtNumber,tempMap);
-            }
-        }
-        System.out.println(votingPercentages);
-
-        for (Point p :pointList)
-            loadPointData(p);
-        System.out.println(skippedCount + "/" + pointList.size());
-        System.out.println(pixelReader.getColor((int) currentDistricts.getWidth()-1,(int)currentDistricts.getHeight()-1));
+//        try (BufferedReader br = new BufferedReader(new FileReader("voting_percentages.txt"))) {
+//            String line;
+//            while ((line = br.readLine()) != null) {
+//                int districtNumber = Integer.parseInt(line);
+//                Map<String, Double> tempMap = new HashMap<>();
+//                String firstParty = br.readLine();
+//                double firstPercentage = Double.parseDouble(br.readLine());
+//
+//                String secondParty = br.readLine();
+//                double secondPercentage = Double.parseDouble(br.readLine());
+//                tempMap.put(firstParty,firstPercentage);
+//                tempMap.put(secondParty,secondPercentage);
+//                votingPercentages.put(districtNumber,tempMap);
+//            }
+//        }
+//        System.out.println(votingPercentages);
+//
+//        for (Point p :pointList)
+//            loadPointData(p);
+//        System.out.println(skippedCount + "/" + pointList.size());
     }
 
     private void simulateElection() {
@@ -263,6 +276,46 @@ public class Main extends Application {
         System.out.println(reps + " " + dems);
     }
 
+    private void simulateElection2() {
+        Map<Color, Map<String, Double>> results = new HashMap<>();
+        for (Centroid centroid : centroidList)
+        {
+            Map<String, Double> temp = new HashMap<>();
+            temp.put("REP", 0d);
+            temp.put("DEM", 0d);
+            results.put(centroid.getColor(),temp);
+        }
+        for (Point p : pointList)
+        {
+                Map<String,Double> votingPattern = p.getVotingPattern();
+                Map<String, Double> districtResult = results.get(p.getColor());
+                districtResult.put("REP", districtResult.get("REP") + votingPattern.get("REP"));
+                districtResult.put("DEM", districtResult.get("DEM") + votingPattern.get("DEM"));
+
+
+        }
+        int reps = 0;
+        int dems = 0;
+
+        Iterator it = results.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry pair = (Map.Entry)it.next();
+            System.out.println(pair.getKey() + " = " + pair.getValue());
+            Map<String, Double> result = (Map) pair.getValue();
+            if (result.get("REP") > result.get("DEM"))
+            {
+                reps++;
+            }
+            else
+            {
+                dems++;
+            }
+
+            it.remove(); // avoids a ConcurrentModificationException
+        }
+        System.out.println(reps + " " + dems);
+    }
+
     public void generateRandomCentroids(int number) {
         List<Color> colors = new LinkedList<>();
         for (int i = 0; i < number; i++)
@@ -280,7 +333,6 @@ public class Main extends Application {
         {
             c.setOldPopulation(c.getPopulation());
             c.setPopulation(0);
-//            c.setWeight(1);
         }
         for (Point p : pointList) {
             double shortestDistance = Integer.MAX_VALUE;
@@ -316,20 +368,15 @@ public class Main extends Application {
         }
 
         for (Point point : pointList) {
-            int population = point.getPopulation();
-            double popMult = population/100000;
             gc.setFill(point.getColor());
             gc.setFill(Color.BLACK);
-//            gc.fillOval(point.getX() - (5 + popMult/2), point.getY() - (5 + popMult/2), 10 + popMult, 10 + popMult);
-            gc.fillOval(point.getX() - 1, point.getY() - 1, 2, 2);
+//            gc.fillOval(point.getX() - 1, point.getY() - 1, 2, 2);
         }
         for (Centroid centroid : centroidList) {
             Color c = centroid.getColor();
             gc.setFill(Color.rgb((int)(c.getRed() * 255),(int)(c.getGreen() * 255),(int)(c.getBlue() * 255),.5));
-            gc.fillOval(centroid.getX() - 20, centroid.getY() - 20, 40, 40);
+//            gc.fillOval(centroid.getX() - 20, centroid.getY() - 20, 40, 40);
         }
-//        Image image = getBackgroundImage();
-//        gc.drawImage(getBackgroundImage(),0,0,800,800);
     }
 
     private void shade(int x, int y, int sideLength) {
@@ -428,12 +475,15 @@ public class Main extends Application {
 //                    continue;
                 if (c.getPopulation() > AVERAGE_POPULATION)
 //                    if (c.getWeight() > 10) continue;
-                    c.setWeight(c.getWeight()+.05);
+                    c.setWeight(c.getWeight()+(.005 * (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION)));
+//            c.setWeight(c.getWeight()+.05);
 //                    c.setWeight(c.getWeight()*.99);
 //                    c.setWeight(c.getWeight()-(.01 * (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION)));
                 if (c.getPopulation() < AVERAGE_POPULATION) {
-                    if (c.getWeight() < .6) continue;
-                    c.setWeight(c.getWeight() - .05);
+//                    if (c.getWeight() < .6) continue;
+//                    c.setWeight(c.getWeight() - .05);
+                    c.setWeight(c.getWeight()-(.005 * (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION)));
+
                 }
 
 //                    c.setWeight(c.getWeight()*1.01);

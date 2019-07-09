@@ -1,5 +1,7 @@
 import javafx.scene.paint.Color;
 
+import java.util.Map;
+
 public class Point
 {
     private double x, y;
@@ -7,6 +9,7 @@ public class Point
     private Color color = Color.BLACK;
     private int population;
     private int districtNumber = 0;
+    private Map<String, Double> votingPattern;
     public Point(double x, double y, int population)
     {
         this.x = x;
@@ -52,5 +55,13 @@ public class Point
 
     public int getDistrictNumber() {
         return districtNumber;
+    }
+
+    public Map<String, Double> getVotingPattern() {
+        return votingPattern;
+    }
+
+    public void setVotingPattern(Map<String, Double> votingPattern) {
+        this.votingPattern = votingPattern;
     }
 }
