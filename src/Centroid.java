@@ -4,7 +4,6 @@ public class Centroid {
 
     private double x, y;
     private Color color;
-    private int oldPopulation = 0;
     private int population = 0;
     private double weight = 1;
     public Centroid(double x, double y, Color color)
@@ -54,11 +53,4 @@ public class Centroid {
         this.weight = weight;
     }
 
-    public int getOldPopulation() {
-        return oldPopulation;
-    }
-
-    public void setOldPopulation(int oldPopulation) {
-        this.oldPopulation = oldPopulation;
-    }
 }

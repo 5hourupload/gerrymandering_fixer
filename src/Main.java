@@ -1,20 +1,15 @@
 import javafx.application.Application;
 import javafx.event.EventHandler;
-import javafx.scene.PointLight;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.image.PixelReader;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
@@ -23,15 +18,18 @@ public class Main extends Application {
     GraphicsContext gc;
     List<Point> pointList = new LinkedList<>();
     List<Centroid> centroidList = new LinkedList<>();
+    List<Centroid> currentCentroidList = new LinkedList<>();
     int DRAW_WIDTH = 800;
     int DRAW_HEIGHT = 800;
     double AVERAGE_POPULATION = 797273;
     int iterations = 0;
-    String currentDistrictsArray[][];
-    Map<String, Integer> colorNumberMap = new HashMap<>();
-    Image currentDistricts;
-    int skippedCount = 0;
-    Map<Integer, Map<String, Double>> votingPercentages = new HashMap<>();
+
+    int highestMin = 0;
+    int lowestMax = Integer.MAX_VALUE;
+    List<Centroid> bestCentroids = new LinkedList<>();
+    boolean showingBestCentroids = false;
+
+
 
 
     public static void main(String[] args) {
@@ -149,29 +147,24 @@ public class Main extends Application {
             public void handle(javafx.event.ActionEvent event) {
                 assignPoints();
                 update();
+                showingBestCentroids = false;
+                currentCentroidList = centroidList;
                 drawPoints();
                 iterations++;
+                System.out.println(iterations);
             }
         });
 
-//        Button printPopulations = new Button();
-//        printPopulations.setText("Print Populations");
-//        printPopulations.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
-//            @Override
-//            public void handle(javafx.event.ActionEvent event) {
-//                printPopulations();
-//            }
-//        });
-//
-//        Button updateWeights = new Button();
-//        updateWeights.setText("update Weights");
-//        updateWeights.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
-//            @Override
-//            public void handle(javafx.event.ActionEvent event) {
-//                updateWeights();
-//                System.out.println("weights updated");
-//            }
-//        });
+        Button switchCentroidView = new Button();
+        switchCentroidView.setText("switch centroid views");
+        switchCentroidView.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
+            @Override
+            public void handle(javafx.event.ActionEvent event) {
+                showingBestCentroids = !showingBestCentroids;
+                currentCentroidList = showingBestCentroids ? bestCentroids : centroidList;
+                drawPoints();
+            }
+        });
 
         Button elect = new Button();
         elect.setText("simulate election");
@@ -179,106 +172,22 @@ public class Main extends Application {
             @Override
             public void handle(javafx.event.ActionEvent event) {
 
-                simulateElection2();
+                simulateElection();
             }
         });
 
         VBox vBox = new VBox();
-        vBox.getChildren().addAll(canvas, update, elect);
+        vBox.getChildren().addAll(canvas, update, elect,switchCentroidView);
         Scene scene = new Scene(vBox);
         stage.setScene(scene);
-        stage.setTitle("Creation of a Canvas");
+        stage.setTitle("gerrymanderr");
         stage.show();
 
-        //load the current districts into the current districts array
-//        currentDistricts = getImage("/texas_district_map_only.png");
-//        PixelReader pixelReader = currentDistricts.getPixelReader();
-//        currentDistrictsArray = new String[(int)currentDistricts.getWidth()][(int)currentDistricts.getHeight()];
-//        for (int i = 0; i < currentDistricts.getWidth(); i++)
-//        {
-//            for (int j = 0; j < currentDistricts.getHeight(); j++)
-//            {
-//                currentDistrictsArray[i][j] = pixelReader.getColor(i,j).toString();
-//            }
-//        }
-//
-        //load in district keys
-        try (BufferedReader br = new BufferedReader(new FileReader("district_key.txt"))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] lineArray = line.split(" ");
-                colorNumberMap.put(lineArray[1],Integer.parseInt(lineArray[0]));
-            }
-        }
-
-        //load in voting percentages
-//        try (BufferedReader br = new BufferedReader(new FileReader("voting_percentages.txt"))) {
-//            String line;
-//            while ((line = br.readLine()) != null) {
-//                int districtNumber = Integer.parseInt(line);
-//                Map<String, Double> tempMap = new HashMap<>();
-//                String firstParty = br.readLine();
-//                double firstPercentage = Double.parseDouble(br.readLine());
-//
-//                String secondParty = br.readLine();
-//                double secondPercentage = Double.parseDouble(br.readLine());
-//                tempMap.put(firstParty,firstPercentage);
-//                tempMap.put(secondParty,secondPercentage);
-//                votingPercentages.put(districtNumber,tempMap);
-//            }
-//        }
-//        System.out.println(votingPercentages);
-//
-//        for (Point p :pointList)
-//            loadPointData(p);
-//        System.out.println(skippedCount + "/" + pointList.size());
     }
 
     private void simulateElection() {
         Map<Color, Map<String, Double>> results = new HashMap<>();
-        for (Centroid centroid : centroidList)
-        {
-            Map<String, Double> temp = new HashMap<>();
-            temp.put("REP", 0d);
-            temp.put("DEM", 0d);
-            results.put(centroid.getColor(),temp);
-        }
-        for (Point p : pointList)
-        {
-            if (p.getDistrictNumber() != 0)
-            {
-                Map<String,Double> votingPattern = votingPercentages.get(p.getDistrictNumber());
-                Map<String, Double> districtResult = results.get(p.getColor());
-                districtResult.put("REP", districtResult.get("REP") + votingPattern.get("REP"));
-                districtResult.put("DEM", districtResult.get("DEM") + votingPattern.get("DEM"));
-
-            }
-        }
-        int reps = 0;
-        int dems = 0;
-
-        Iterator it = results.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry pair = (Map.Entry)it.next();
-            System.out.println(pair.getKey() + " = " + pair.getValue());
-            Map<String, Double> result = (Map) pair.getValue();
-            if (result.get("REP") > result.get("DEM"))
-            {
-                reps++;
-            }
-            else
-            {
-                dems++;
-            }
-
-            it.remove(); // avoids a ConcurrentModificationException
-        }
-        System.out.println(reps + " " + dems);
-    }
-
-    private void simulateElection2() {
-        Map<Color, Map<String, Double>> results = new HashMap<>();
-        for (Centroid centroid : centroidList)
+        for (Centroid centroid : currentCentroidList)
         {
             Map<String, Double> temp = new HashMap<>();
             temp.put("REP", 0d);
@@ -291,8 +200,6 @@ public class Main extends Application {
                 Map<String, Double> districtResult = results.get(p.getColor());
                 districtResult.put("REP", districtResult.get("REP") + votingPattern.get("REP"));
                 districtResult.put("DEM", districtResult.get("DEM") + votingPattern.get("DEM"));
-
-
         }
         int reps = 0;
         int dems = 0;
@@ -310,7 +217,6 @@ public class Main extends Application {
             {
                 dems++;
             }
-
             it.remove(); // avoids a ConcurrentModificationException
         }
         System.out.println(reps + " " + dems);
@@ -331,7 +237,6 @@ public class Main extends Application {
     private void assignPoints() {
         for (Centroid c : centroidList)
         {
-            c.setOldPopulation(c.getPopulation());
             c.setPopulation(0);
         }
         for (Point p : pointList) {
@@ -359,7 +264,7 @@ public class Main extends Application {
         gc.setFill(Color.WHITE);
         gc.fillRect(0, 0, DRAW_WIDTH, DRAW_HEIGHT);
 
-        if (centroidList.size() > 0) {
+        if (currentCentroidList.size() > 0) {
 
             shade(0, 0, DRAW_WIDTH / 2);
             shade(DRAW_WIDTH / 2, 0, DRAW_WIDTH / 2);
@@ -370,12 +275,12 @@ public class Main extends Application {
         for (Point point : pointList) {
             gc.setFill(point.getColor());
             gc.setFill(Color.BLACK);
-//            gc.fillOval(point.getX() - 1, point.getY() - 1, 2, 2);
+            gc.fillOval(point.getX() - 1, point.getY() - 1, 2, 2);
         }
-        for (Centroid centroid : centroidList) {
+        for (Centroid centroid : currentCentroidList) {
             Color c = centroid.getColor();
             gc.setFill(Color.rgb((int)(c.getRed() * 255),(int)(c.getGreen() * 255),(int)(c.getBlue() * 255),.5));
-//            gc.fillOval(centroid.getX() - 20, centroid.getY() - 20, 40, 40);
+            gc.fillOval(centroid.getX() - 20, centroid.getY() - 20, 40, 40);
         }
     }
 
@@ -383,7 +288,8 @@ public class Main extends Application {
         Color startPaint = getClosestPaint(x, y);
         if (startPaint == getClosestPaint(x, y + sideLength - 1) &&
                 startPaint == getClosestPaint(x + sideLength - 1, y) &&
-                startPaint == getClosestPaint(x + sideLength - 1, y + sideLength - 1)) {
+                startPaint == getClosestPaint(x + sideLength - 1, y + sideLength - 1) &&
+                startPaint == getClosestPaint(x + (sideLength-1)/2, y + (sideLength-1)/2)) {
 
             Color tint = startPaint;
             tint = Color.rgb((int) (tint.getRed() * 255), (int) (tint.getGreen() * 255),
@@ -409,7 +315,7 @@ public class Main extends Application {
         Color local = null;
         double shortestDistance = Integer.MAX_VALUE;
 
-        for (Centroid c : centroidList) {
+        for (Centroid c : currentCentroidList) {
             double distance = Math.sqrt(Math.pow((c.getX() - x), 2) + Math.pow((c.getY() - y), 2)) * c.getWeight();
             if (distance < shortestDistance) {
                 shortestDistance = distance;
@@ -441,31 +347,41 @@ public class Main extends Application {
             meanX /= points.size();
             meanY /= points.size();
 
-            double vector[] = {meanX - c.getX(),meanY-c.getY()};
             if (points.size() != 0) {
-//                c.setX(c.getX() + vector[0] * c.getWeight());
-//                c.setY(c.getY() + vector[1] * c.getWeight());
                 c.setX(meanX);
                 c.setY(meanY);
             }
         }
+
     }
     private void printPopulations()
     {
-        double total = 0;
         LinkedList<Integer> populations = new LinkedList<>();
         int min = Integer.MAX_VALUE;
         int max = 0;
         for (Centroid c : centroidList)
         {
-            total+=c.getPopulation();
             populations.add(c.getPopulation());
             min = min < c.getPopulation() ? min : c.getPopulation();
             max = max > c.getPopulation() ? max : c.getPopulation();
         }
-//        System.out.println("average: " + total/centroidList.size());
         System.out.println(populations);
         System.out.println("min: " + min + " max: " + max);
+        System.out.println("best min: " + highestMin + " best max: " + lowestMax);
+        if (min > highestMin && max < lowestMax)
+        {
+            System.out.println("UPDATING BEST CENTROIDS");
+            highestMin = min;
+            lowestMax = max;
+            bestCentroids.clear();
+            for (Centroid c : centroidList)
+            {
+                Centroid temp = new Centroid(c.getX(), c.getY(), c.getColor());
+                temp.setPopulation(c.getPopulation());
+                temp.setWeight(c.getWeight());
+                bestCentroids.add(temp);
+            }
+        }
     }
     private void updateWeights()
     {
@@ -474,43 +390,12 @@ public class Main extends Application {
 //                if (Math.abs(c.getPopulation() - AVERAGE_POPULATION) < 50_000)
 //                    continue;
                 if (c.getPopulation() > AVERAGE_POPULATION)
-//                    if (c.getWeight() > 10) continue;
                     c.setWeight(c.getWeight()+(.005 * (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION)));
-//            c.setWeight(c.getWeight()+.05);
-//                    c.setWeight(c.getWeight()*.99);
-//                    c.setWeight(c.getWeight()-(.01 * (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION)));
                 if (c.getPopulation() < AVERAGE_POPULATION) {
-//                    if (c.getWeight() < .6) continue;
-//                    c.setWeight(c.getWeight() - .05);
                     c.setWeight(c.getWeight()-(.005 * (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION)));
-
                 }
-
-//                    c.setWeight(c.getWeight()*1.01);
-//                    c.setWeight(c.getWeight()+(.01 * (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION)));
-
 
             System.out.print(c.getWeight() + ":" + (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION) + " ");
         }
-    }
-    private Image getImage(String name) {
-        return new Image(getClass().getResourceAsStream(name));
-
-    }
-    private void loadPointData(Point point)
-    {
-        double xPercentage = point.getX()/DRAW_WIDTH;
-        double yPercentage = point.getY()/DRAW_HEIGHT;
-        int newX = (int) (currentDistricts.getWidth() * xPercentage);
-        int newY = (int) (currentDistricts.getHeight() * yPercentage);
-        String color = currentDistrictsArray[newX][newY];
-        if (!colorNumberMap.containsKey(color))
-        {
-            skippedCount++;
-            return;
-        }
-        point.setDistrictNumber(colorNumberMap.get(color));
-//        System.out.println(newX + " " + newY);
-
     }
 }
