@@ -1,26 +1,34 @@
 import javafx.application.Application;
+import javafx.embed.swing.SwingFXUtils;
+import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 
+import javax.imageio.ImageIO;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Main extends Application {
     GraphicsContext gc;
     List<Point> pointList = new LinkedList<>();
     List<Centroid> centroidList = new LinkedList<>();
     List<Centroid> currentCentroidList = new LinkedList<>();
-    int DRAW_WIDTH = 800;
-    int DRAW_HEIGHT = 800;
+    int DRAW_WIDTH = 2048;
+    int DRAW_HEIGHT = 2048;
     double AVERAGE_POPULATION = 797273;
     int iterations = 0;
 
@@ -155,6 +163,24 @@ public class Main extends Application {
             }
         });
 
+        Button updateMult = new Button();
+        updateMult.setText("update multiple times");
+        updateMult.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
+            @Override
+            public void handle(javafx.event.ActionEvent event) {
+                for (int i = 0; i < 1000; i++)
+                {
+                    assignPoints();
+                    update();
+                    iterations++;
+                    System.out.println(iterations);
+                }
+
+                showingBestCentroids = false;
+                currentCentroidList = centroidList;
+                drawPoints();
+            }
+        });
         Button switchCentroidView = new Button();
         switchCentroidView.setText("switch centroid views");
         switchCentroidView.setOnAction(new EventHandler<javafx.event.ActionEvent>() {
@@ -176,8 +202,21 @@ public class Main extends Application {
             }
         });
 
+        Button snapShotBtn = new Button("Take a Snapshot");
+        snapShotBtn.setOnAction((ActionEvent t) -> {
+            try {
+                SnapshotParameters parameters = new SnapshotParameters();
+                WritableImage wi = new WritableImage(DRAW_WIDTH, DRAW_HEIGHT);
+                WritableImage snapshot = canvas.snapshot(new SnapshotParameters(), wi);
+
+                File output = new File("snapshot" + new Date().getTime() + ".png");
+                ImageIO.write(SwingFXUtils.fromFXImage(snapshot, null), "png", output);
+            } catch (IOException ex) {
+                Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        });
         VBox vBox = new VBox();
-        vBox.getChildren().addAll(canvas, update, elect,switchCentroidView);
+        vBox.getChildren().addAll(update, updateMult, elect,switchCentroidView, snapShotBtn, canvas);
         Scene scene = new Scene(vBox);
         stage.setScene(scene);
         stage.setTitle("gerrymanderr");
@@ -275,12 +314,12 @@ public class Main extends Application {
         for (Point point : pointList) {
             gc.setFill(point.getColor());
             gc.setFill(Color.BLACK);
-            gc.fillOval(point.getX() - 1, point.getY() - 1, 2, 2);
+//            gc.fillOval(point.getX() - 1, point.getY() - 1, 2, 2);
         }
         for (Centroid centroid : currentCentroidList) {
             Color c = centroid.getColor();
             gc.setFill(Color.rgb((int)(c.getRed() * 255),(int)(c.getGreen() * 255),(int)(c.getBlue() * 255),.5));
-            gc.fillOval(centroid.getX() - 20, centroid.getY() - 20, 40, 40);
+//            gc.fillOval(centroid.getX() - 20, centroid.getY() - 20, 40, 40);
         }
     }
 
@@ -293,7 +332,7 @@ public class Main extends Application {
 
             Color tint = startPaint;
             tint = Color.rgb((int) (tint.getRed() * 255), (int) (tint.getGreen() * 255),
-                    (int) tint.getBlue() * 255, .25);
+                    (int) tint.getBlue() * 255, .5);
 
             gc.setFill(Color.WHITE);
             gc.fillRect(x, y, x + sideLength, y + sideLength);
@@ -366,6 +405,7 @@ public class Main extends Application {
             max = max > c.getPopulation() ? max : c.getPopulation();
         }
         System.out.println(populations);
+        System.out.println("stdev: " + calculateSD(populations));
         System.out.println("min: " + min + " max: " + max);
         System.out.println("best min: " + highestMin + " best max: " + lowestMax);
         if (min > highestMin && max < lowestMax)
@@ -397,5 +437,18 @@ public class Main extends Application {
 
             System.out.print(c.getWeight() + ":" + (Math.abs(c.getPopulation()-AVERAGE_POPULATION)/AVERAGE_POPULATION) + " ");
         }
+    }
+    public static double calculateSD(List<Integer> numbers)
+    {
+        double sum = 0.0, standardDeviation = 0.0;
+        int length = numbers.size();
+        for(double num : numbers) {
+            sum += num;
+        }
+        double mean = sum/length;
+        for(double num: numbers) {
+            standardDeviation += Math.pow(num - mean, 2);
+        }
+        return Math.sqrt(standardDeviation/length);
     }
 }
