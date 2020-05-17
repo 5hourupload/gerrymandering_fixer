@@ -53,6 +53,8 @@ public class GeneralElectionResults {
         System.out.println(partyPopulations);
         double total = partyPopulations.get("REP") + partyPopulations.get("DEM") + partyPopulations.get("misc");
         System.out.println(partyPopulations.get("REP")/total);
+        System.out.println(partyPopulations.get("DEM")/total);
+        System.out.println(partyPopulations.get("misc")/total);
         System.out.println("Republicans: " + repRep + " " + (double)repRep/(repRep+demRep) + " Democrats: " + demRep);
         System.out.println(populations.size());
         System.out.println(populations);
